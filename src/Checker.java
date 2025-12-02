@@ -17,12 +17,5 @@ public abstract class Checker implements Runnable {
         }
     }
 
-    public List<String> getErrors() {
-        if (errors == null) {
-            return Collections.emptyList();
-        }
-        return errors;
-    }
-
     public abstract void run();
 }

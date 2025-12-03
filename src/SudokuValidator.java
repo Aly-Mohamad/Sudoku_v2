@@ -9,47 +9,12 @@ public class SudokuValidator {
         this.board = board;
     }
 
-    public void validate(int mode) {
-        List<Thread> threads = new ArrayList<>();
-
-        switch (mode) {
-            case 0:
-                for (int i = 0; i < 9; i++) {
-                    CheckerFactory.createChecker("ROW", board, errors, i).run();
-                    CheckerFactory.createChecker("COL", board, errors, i).run();
-                    CheckerFactory.createChecker("BOX", board, errors, i).run();
-                }
-                break;
-            case 3:
-                threads.add(new Thread(() -> {
-                    for (int i = 0; i < 9; i++)
-                        CheckerFactory.createChecker("ROW", board, errors, i).run();
-                }));
-
-                threads.add(new Thread(() -> {
-                    for (int i = 0; i < 9; i++)
-                        CheckerFactory.createChecker("COL", board, errors, i).run();
-                }));
-
-                threads.add(new Thread(() -> {
-                    for (int i = 0; i < 9; i++)
-                        CheckerFactory.createChecker("BOX", board, errors, i).run();
-                }));
-                break;
-            case 27:
-                for (int i = 0; i < 9; i++) {
-                    threads.add(new Thread(CheckerFactory.createChecker("ROW", board, errors, i)));
-                    threads.add(new Thread(CheckerFactory.createChecker("COL", board, errors, i)));
-                    threads.add(new Thread(CheckerFactory.createChecker("BOX", board, errors, i)));
-                }
-                break;
+    public void validate() {
+        for (int i = 0; i < 9; i++) {
+            CheckerFactory.createChecker("ROW", board, errors, i).run();
+            CheckerFactory.createChecker("COL", board, errors, i).run();
+            CheckerFactory.createChecker("BOX", board, errors, i).run();
         }
-
-        for (Thread t : threads) t.start();
-
-        for (Thread t : threads)
-            try {t.join();} catch (Exception ignored) {}
-
         printResult();
     }
 

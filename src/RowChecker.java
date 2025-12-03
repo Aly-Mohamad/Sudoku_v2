@@ -26,7 +26,7 @@ public class RowChecker extends Checker {
         for (int n = 1; n <= 9; n++) {
             if (freq[n] > 1) {
                 String entry = "ROW " + (row + 1) + ", #" + n + ", " + positions[n];
-                addError(entry);
+                errors.add(entry);
             }
         }
     }

@@ -19,7 +19,6 @@ public class SudokuBoard {
         } catch (Exception e) {
             e.printStackTrace();
         }
-
         this.board = array;
     }
 

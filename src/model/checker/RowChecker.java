@@ -1,3 +1,5 @@
+package model.checker;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -19,6 +21,7 @@ public class RowChecker extends Checker {
 
         for (int col = 0; col < 9; col++) {
             int val = board[row][col];
+            if(val == 0) continue;
             freq[val]++;
             positions[val].add(col + 1);
         }

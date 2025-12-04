@@ -3,56 +3,82 @@ package controller;
 import controller.exceptions.SolutionInvalidException;
 import model.SudokuBoard;
 import model.SudokuValidator;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
-
-
-//To be edited not fully implemented
-
-
 
 public class GameDriver {
 
-    private SudokuBoard board;
+    private SudokuBoard currentBoard;
+    private SudokuBoard solvedBoard;
     private String difficulty;
+    private GameStorage storage;
 
-    public GameDriver(SudokuBoard board) throws SolutionInvalidException {
-        this.board = board;
-        SudokuValidator validator = new SudokuValidator(board.getBoard());
-        String result = validator.validate(); // modify validator to return status
+    public GameDriver(GameStorage storage) {
+        this.storage = storage;
+    }
 
-        if(result.equals(SudokuValidator.INVALID) || result.equals(SudokuValidator.INCOMPLETE)) {
-            throw new SolutionInvalidException("Source board is " + result);
+    public SudokuBoard getCurrentBoard() {
+        return currentBoard;
+    }
+
+    public void startNewGame(String difficulty, String puzzleName) throws IOException {
+        this.difficulty = difficulty;
+        this.solvedBoard = storage.loadGame(difficulty, puzzleName);
+        this.currentBoard = GameGenerator.generateGame(solvedBoard, difficulty);
+    }
+
+    public void resumeIncomplete() throws IOException {
+        this.currentBoard = storage.loadIncomplete("board");
+        this.solvedBoard = currentBoard.copy(); // copy so solving still works
+        this.difficulty = "incomplete";
+    }
+
+    public boolean verifyBoard() {
+        SudokuValidator validator = new SudokuValidator(currentBoard.getBoard());
+        return validator.isValid();
+    }
+
+    public void solveBoard() {
+        if (countEmptyCells() == 5 && solvedBoard != null) {
+            this.currentBoard = solvedBoard.copy();
         }
     }
 
-    public SudokuBoard getBoard() {
-        return board;
+    public void saveCurrentGame(String mode, String fileName) throws IOException {
+        storage.saveGame(currentBoard, mode, fileName);
     }
 
-    public String getDifficulty() {
-            return difficulty;
+
+    public boolean hasIncomplete() {
+        return storage.hasBoard("incomplete");
     }
 
-    public void startNewGame(String difficulty) {
-        this.difficulty = difficulty;
-        SudokuBoard SolvedBoard = board.copy();
-        this.board = GameGenerator.generateGame(SolvedBoard, difficulty);
+    public void saveIncomplete() throws IOException {
+        storage.saveIncomplete(currentBoard, "board");
     }
 
-    public void loadGame(String filename) {
-        // stub
+
+    public List<String> listGames(String difficulty) {
+        File[] files = storage.getBoards(difficulty);
+        List<String> names = new ArrayList<>();
+        if (files != null) {
+            for (File f : files) {
+                names.add(f.getName().replace(".csv", ""));
+            }
+        }
+        return names;
     }
 
-    public void saveGame(String filename) {
-        // stub
-    }
 
-    public void undoMove() {
-        // stub
-    }
-
-    public List<String> verifyBoard() {
-        // stub
-        return null;
+    private int countEmptyCells() {
+        int count = 0;
+        int[][] boardArr = currentBoard.getBoard();
+        for (int i = 0; i < 9; i++)
+            for (int j = 0; j < 9; j++)
+                if (boardArr[i][j] == 0) count++;
+        return count;
     }
 }

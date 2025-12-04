@@ -6,9 +6,10 @@ import model.SudokuBoard;
 import java.util.List;
 
 public class GameGenerator {
+    //Easier to call or edit in the future
     private static final int EASY = 15;
-    private static final int MEDIUM = 25;
-    private static final int HARD = 35;
+    private static final int MEDIUM = 20;
+    private static final int HARD = 25;
 
     public static SudokuBoard generateGame(SudokuBoard solvedBoard,String difficulty) {
         SudokuBoard puzzle = solvedBoard.copy();
@@ -23,7 +24,7 @@ public class GameGenerator {
     }
 
     private static int getCellsToRemove(String difficulty){
-        switch (difficulty){
+        switch (difficulty.toUpperCase()){
             case "EASY": return EASY;
             case "MEDIUM": return MEDIUM;
             case "HARD": return HARD;

@@ -1,8 +1,10 @@
 package ui;
 
+import controller.Catalog;
 import controller.GameDriver;
 import controller.GameStorage;
-import model.SudokuBoard;
+import controller.DifficultyEnum;
+import controller.exceptions.InvalidGameException;
 
 import javax.swing.*;
 import java.awt.*;
@@ -14,13 +16,18 @@ public class SudokuGUI extends JFrame {
     private GameBoardView boardView;
     private JPanel buttonPanel;
     private JButton solveBtn;
+    private Catalog c = getCatalogue();
 
     public SudokuGUI(GameStorage storage) {
         driver = new GameDriver(storage);
         setTitle("Sudoku");
         setSize(600, 700);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
         setLayout(new BorderLayout());
+
+
+        //create another panel
 
         boardView = new GameBoardView();
         boardView.setCellChangeListener(() -> updateSolveButton());
@@ -55,24 +62,50 @@ public class SudokuGUI extends JFrame {
     }
 
     private void startNewGame() {
-        String[] options = {"EASY", "MEDIUM", "HARD"};
-        String difficulty = (String) JOptionPane.showInputDialog(this, "Select Difficulty",
-                "New Game", JOptionPane.PLAIN_MESSAGE, null, options, options[0]);
+        DifficultyEnum[] options = DifficultyEnum.values();
+        char diffchar = ' ';
+        DifficultyEnum difficulty = (DifficultyEnum) JOptionPane.showInputDialog(
+                this,
+                "Select Difficulty",
+                "New Game",
+                JOptionPane.PLAIN_MESSAGE,
+                null,
+                options,
+                options[0]
+        );
+
         if (difficulty != null) {
-            String[] games = driver.listGames(difficulty.toLowerCase()).toArray(new String[0]);
+            String[] games = driver.listGames(difficulty.toString().toLowerCase()).toArray(new String[0]);
             if (games.length == 0) {
                 JOptionPane.showMessageDialog(this, "No puzzles available for " + difficulty);
                 return;
             }
-            String puzzle = (String) JOptionPane.showInputDialog(this, "Select Puzzle",
-                    "New Game", JOptionPane.PLAIN_MESSAGE, null, games, games[0]);
+            String puzzle = (String) JOptionPane.showInputDialog(
+                    this,
+                    "Select Puzzle",
+                    "New Game",
+                    JOptionPane.PLAIN_MESSAGE,
+                    null,
+                    games,
+                    games[0]
+            );
+
             if (puzzle != null) {
                 try {
-                    driver.startNewGame(difficulty.toLowerCase(), puzzle);
-                    boardView.displayBoard(driver.getCurrentBoard());
+                    switch (difficulty) {
+                        case EASY : diffchar = 'E'; break;
+                        case MEDIUM : diffchar = 'M'; break;
+                        case HARD : diffchar = 'H'; break;
+                    }
+                    driver.startNewGame(diffchar, puzzle);
+
+                    boardView.displayBoard(driver.getCurrentGame());
                     updateSolveButton();
+
                 } catch (IOException ex) {
                     JOptionPane.showMessageDialog(this, "Failed to load puzzle: " + ex.getMessage());
+                } catch (InvalidGameException ex){
+                    JOptionPane.showMessageDialog(this, "Invalid Game");
                 }
             }
         }
@@ -85,7 +118,7 @@ public class SudokuGUI extends JFrame {
         }
         try {
             driver.resumeIncomplete();
-            boardView.displayBoard(driver.getCurrentBoard());
+            boardView.displayBoard(driver.getCurrentGame());
             updateSolveButton();
         } catch (IOException e) {
             JOptionPane.showMessageDialog(this, "Failed to load incomplete game: " + e.getMessage());
@@ -93,26 +126,28 @@ public class SudokuGUI extends JFrame {
     }
 
     private void verifyBoard() {
-        boardView.updateBoard(driver.getCurrentBoard());
-        boolean valid = driver.verifyBoard();
-        if (valid) {
-            JOptionPane.showMessageDialog(this, "Board is valid!");
-        } else {
-            JOptionPane.showMessageDialog(this, "Board has errors or incomplete cells.");
-        }
-        updateSolveButton();
+       try {
+           boardView.updateBoard(driver.getCurrentGame());
+           boolean valid = driver.verifyBoard(driver.getCurrentGame().getBoard());
+           if (valid) {
+               JOptionPane.showMessageDialog(this, "Board is valid!");
+           }
+           updateSolveButton();
+       } catch (InvalidGameException ex) {
+           JOptionPane.showMessageDialog(this, "Board has errors or incomplete cells.");
+       }
     }
 
     private void solveBoard() {
         driver.solveBoard();
-        boardView.displayBoard(driver.getCurrentBoard());
+        boardView.displayBoard(driver.getCurrentGame());
         updateSolveButton();
     }
 
     private void saveAndExit() {
-        boardView.updateBoard(driver.getCurrentBoard());
+        boardView.updateBoard(driver.getCurrentGame());
         try {
-            driver.saveCurrentGame("incomplete", "board");
+            driver.saveCurrentGame("Incomplete","board");
         } catch (IOException e) {
             JOptionPane.showMessageDialog(this, "Failed to save game: " + e.getMessage());
         }
@@ -121,7 +156,7 @@ public class SudokuGUI extends JFrame {
 
     private int countEmptyCells() {
         int count = 0;
-        int[][] board = driver.getCurrentBoard().getBoard();
+        int[][] board = driver.getCurrentGame().getBoard();
         for (int i = 0; i < 9; i++) {
             for (int j = 0; j < 9; j++) {
                 if (board[i][j] == 0) count++;
@@ -134,8 +169,7 @@ public class SudokuGUI extends JFrame {
         solveBtn.setEnabled(countEmptyCells() == 5);
     }
 
-//    public static void main(String[] args) {
-//        GameStorage storage = new GameStorage();
-//        SwingUtilities.invokeLater(() -> new SudokuGUI(storage));
-//    }
+    private Catalog getCatalogue() {
+        return new Catalog();
+    }
 }

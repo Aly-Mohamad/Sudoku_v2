@@ -1,7 +1,6 @@
 package ui;
 
-import model.SudokuBoard;
-
+import model.Game;
 import javax.swing.*;
 import javax.swing.border.Border;
 import javax.swing.border.MatteBorder;
@@ -27,7 +26,6 @@ public class GameBoardView extends JPanel {
                 JTextField cell = new JTextField();
                 cell.setHorizontalAlignment(JTextField.CENTER);
 
-                // Set borders to distinguish 3x3 boxes
                 int top = (i % 3 == 0) ? 3 : 1;
                 int left = (j % 3 == 0) ? 3 : 1;
                 int bottom = (i == 8) ? 3 : 1;
@@ -58,8 +56,8 @@ public class GameBoardView extends JPanel {
         this.listener = l;
     }
 
-    public void displayBoard(SudokuBoard board) {
-        int[][] b = board.getBoard();
+    public void displayBoard(Game game) {
+        int[][] b = game.getBoard();
         for (int i = 0; i < 9; i++) {
             for (int j = 0; j < 9; j++) {
                 if (b[i][j] == 0) {
@@ -75,7 +73,7 @@ public class GameBoardView extends JPanel {
         }
     }
 
-    public void updateBoard(SudokuBoard board) {
+    public void updateBoard(Game game) {
         for (int i = 0; i < 9; i++) {
             for (int j = 0; j < 9; j++) {
                 String text = cells[i][j].getText();
@@ -83,7 +81,7 @@ public class GameBoardView extends JPanel {
                 if (!text.isEmpty()) {
                     try { val = Integer.parseInt(text); } catch (NumberFormatException ignored) {}
                 }
-                board.setCell(i, j, val);
+                game.setValue(i, j, val);
             }
         }
     }

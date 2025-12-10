@@ -50,8 +50,5 @@ public class SudokuBoard {
         return board[row][col] == 0;
     }
 
-    public SudokuBoard copy(){
-        return new SudokuBoard(this.board);
-    }
 
 }

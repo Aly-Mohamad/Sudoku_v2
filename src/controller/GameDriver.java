@@ -1,68 +1,76 @@
 package controller;
 
+import controller.exceptions.InvalidGameException;
+import controller.exceptions.NotFoundException;
 import controller.exceptions.SolutionInvalidException;
-import model.SudokuBoard;
+import controller.interfaces.Controllable;
 import model.SudokuValidator;
-
+import model.Game;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class GameDriver {
-
-    private SudokuBoard currentBoard;
-    private SudokuBoard solvedBoard;
-    private String difficulty;
+public class GameDriver implements Controllable {
+    private Game currentGame;
+    private Game solvedGame;
     private GameStorage storage;
+    private GameLoader loader;
+    private GameGenerator generator;
 
     public GameDriver(GameStorage storage) {
         this.storage = storage;
+        this.loader = new GameLoader();
+        this.generator = new GameGenerator();
     }
 
-    public SudokuBoard getCurrentBoard() {
-        return currentBoard;
+    public Game getCurrentGame() {
+        return currentGame;
     }
 
-    public void startNewGame(String difficulty, String puzzleName) throws IOException {
-        this.difficulty = difficulty;
-        this.solvedBoard = storage.loadGame(difficulty, puzzleName);
-        this.currentBoard = GameGenerator.generateGame(solvedBoard, difficulty);
+    public void startNewGame(char difficulty, String puzzleName) throws IOException {
+        String diff;
+        switch (Character.toUpperCase(difficulty)) {
+            case 'E': diff = "easy"; break;
+            case 'M': diff = "medium"; break;
+            case 'H': diff = "hard"; break;
+            default:
+                throw new NotFoundException("Invalid difficulty: " + difficulty);
+        }
+        this.solvedGame = loader.loadGame(diff, puzzleName);
+        verifyBoard(solvedGame.getBoard());
+        driveGames(getGame(difficulty));
+
     }
 
     public void resumeIncomplete() throws IOException {
-        this.currentBoard = storage.loadIncomplete("board");
-        this.solvedBoard = currentBoard.copy(); // copy so solving still works
-        this.difficulty = "incomplete";
+        this.currentGame = loader.loadIncomplete("board");
+        this.solvedGame = currentGame.copy();
     }
 
-    public boolean verifyBoard() {
-        SudokuValidator validator = new SudokuValidator(currentBoard.getBoard());
-        return validator.isValid();
+    public boolean verifyBoard(int[][] board) {
+        SudokuValidator validator = new SudokuValidator(board);
+        if (validator.isValid())
+            return true;
+        else throw new InvalidGameException("Invalid game");
     }
 
     public void solveBoard() {
-        if (countEmptyCells() == 5 && solvedBoard != null) {
-            this.currentBoard = solvedBoard.copy();
+        if (countEmptyCells() == 5 && solvedGame != null) {
+            this.currentGame = solvedGame.copy();
         }
     }
 
     public void saveCurrentGame(String mode, String fileName) throws IOException {
-        storage.saveGame(currentBoard, mode, fileName);
+        storage.saveGame(currentGame, mode, fileName);
     }
-
 
     public boolean hasIncomplete() {
-        return storage.hasBoard("incomplete");
+        return storage.hasBoard("Incomplete");
     }
 
-    public void saveIncomplete() throws IOException {
-        storage.saveIncomplete(currentBoard, "board");
-    }
-
-
-    public List<String> listGames(String difficulty) {
-        File[] files = storage.getBoards(difficulty);
+    public List<String> listGames(String mode) {
+        File[] files = storage.getBoards(mode);
         List<String> names = new ArrayList<>();
         if (files != null) {
             for (File f : files) {
@@ -72,13 +80,50 @@ public class GameDriver {
         return names;
     }
 
-
     private int countEmptyCells() {
         int count = 0;
-        int[][] boardArr = currentBoard.getBoard();
+        int[][] boardArr = currentGame.getBoard();
         for (int i = 0; i < 9; i++)
             for (int j = 0; j < 9; j++)
                 if (boardArr[i][j] == 0) count++;
         return count;
+    }
+
+    @Override
+    public Catalog getCatalog() {
+        return new Catalog();
+    }
+
+    @Override
+    public int[][] getGame(char level) throws NotFoundException {
+        DifficultyEnum diff;
+
+        switch (Character.toUpperCase(level)) {
+            case 'E': diff = DifficultyEnum.EASY; break;
+            case 'M': diff = DifficultyEnum.MEDIUM; break;
+            case 'H': diff = DifficultyEnum.HARD; break;
+            default:
+                throw new NotFoundException("Invalid difficulty: " + level);
+        }
+
+        return generator.generate(solvedGame, diff).getBoard();
+    }
+
+    @Override
+    public void driveGames(int[][] source) {
+        this.currentGame = new Game(source);
+    }
+
+    @Override
+    public boolean[][] verifyGame(int[][] game) {
+        boolean[][] valid = new boolean[9][9];
+        SudokuValidator validator = new SudokuValidator(game);
+
+        for (int i = 0; i < 9; i++) {
+            for (int j = 0; j < 9; j++) {
+                valid[i][j] = validator.isCellValid(i, j);
+            }
+        }
+        return valid;
     }
 }

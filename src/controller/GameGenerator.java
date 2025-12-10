@@ -1,34 +1,52 @@
 package controller;
 
 import model.RandomPairs;
-import model.SudokuBoard;
-
+import model.Game;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class GameGenerator {
-    //Easier to call or edit in the future
-    private static final int EASY = 15;
-    private static final int MEDIUM = 20;
-    private static final int HARD = 25;
+    private final RandomPairs randomPairs = new RandomPairs();
 
-    public static SudokuBoard generateGame(SudokuBoard solvedBoard,String difficulty) {
-        SudokuBoard puzzle = solvedBoard.copy();
+    public Game generate(Game solved, DifficultyEnum difficulty) {
 
-
-        int cellsToRemove = getCellsToRemove(difficulty.toUpperCase());
-        List<int[]> RemovePairs = new RandomPairs().getNPairs(cellsToRemove);
-        for (int[] pair : RemovePairs) {
-            puzzle.setCell(pair[0], pair[1], 0);
+        int eraseCount;
+        switch (difficulty) {
+            case EASY: eraseCount = 10; break;
+            case MEDIUM: eraseCount = 20; break;
+            case HARD: eraseCount = 25; break;
+            default:
+                throw new IllegalArgumentException("Invalid difficulty for generation");
         }
-        return puzzle;
-    }
 
-    private static int getCellsToRemove(String difficulty){
-        switch (difficulty.toUpperCase()){
-            case "EASY": return EASY;
-            case "MEDIUM": return MEDIUM;
-            case "HARD": return HARD;
+        int[][] board = solved.getBoard();
+        Game newGame = new Game(board, difficulty);
+
+        Set<Integer> removed = new HashSet<>();
+        List<int[]> pairs = randomPairs.generateDistinctPairs(eraseCount * 3);
+
+        for (int[] pair : pairs) {
+            if (removed.size() == eraseCount) break;
+
+            int index = pair[0] % 81;
+
+            if (removed.add(index)) {
+                int row = index / 9;
+                int col = index % 9;
+                newGame.setValue(row, col, 0);
+            }
         }
-        return 0;
+
+        while (removed.size() < eraseCount) {
+            int x = new java.util.Random().nextInt(81);
+            if (removed.add(x)) {
+                int row = x / 9;
+                int col = x % 9;
+                newGame.setValue(row, col, 0);
+            }
+        }
+
+        return newGame;
     }
 }

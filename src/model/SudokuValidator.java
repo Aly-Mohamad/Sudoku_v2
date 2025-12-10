@@ -46,4 +46,21 @@ public class SudokuValidator {
     public boolean isValid() {
         return validate().equals(VALID);
     }
+
+    public boolean isCellValid(int row, int col) {
+        List<String> tempErrors = new ArrayList<>();
+
+        CheckerFactory.createChecker("ROW", board, tempErrors, row).run();
+        CheckerFactory.createChecker("COL", board, tempErrors, col).run();
+        int boxIndex = (row / 3) * 3 + (col / 3);
+        CheckerFactory.createChecker("BOX", board, tempErrors, boxIndex).run();
+
+        for (String err : tempErrors) {
+            if (err.contains("(" + row + "," + col + ")")) {
+                return false;
+            }
+        }
+
+        return true;
+    }
 }

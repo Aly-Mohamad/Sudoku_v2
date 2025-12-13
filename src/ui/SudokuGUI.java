@@ -5,36 +5,36 @@ import controller.GameDriver;
 import controller.GameStorage;
 import controller.DifficultyEnum;
 import controller.exceptions.InvalidGameException;
+import controller.exceptions.NotFoundException;
+import controller.exceptions.SolutionInvalidException;
+import controller.interfaces.Viewable;
+import model.*;
 
 import javax.swing.*;
 import java.awt.*;
 import java.io.IOException;
 
-public class SudokuGUI extends JFrame {
+public class SudokuGUI extends JFrame implements Viewable {
 
     private GameDriver driver;
     private GameBoardView boardView;
-    private JPanel buttonPanel;
     private JButton solveBtn;
-    private Catalog c = getCatalogue();
+    private Catalog catalog = new Catalog();
 
     public SudokuGUI(GameStorage storage) {
         driver = new GameDriver(storage);
+
         setTitle("Sudoku");
         setSize(600, 700);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
 
-
-        //create another panel
-
         boardView = new GameBoardView();
-        boardView.setCellChangeListener(() -> updateSolveButton());
+        boardView.setCellChangeListener(this::updateSolveButton);
         add(boardView, BorderLayout.CENTER);
 
-        buttonPanel = new JPanel();
-        buttonPanel.setLayout(new FlowLayout());
+        JPanel buttonPanel = new JPanel(new FlowLayout());
 
         JButton newGameBtn = new JButton("New Game");
         JButton resumeBtn = new JButton("Resume");
@@ -59,55 +59,62 @@ public class SudokuGUI extends JFrame {
         saveBtn.addActionListener(e -> saveAndExit());
 
         setVisible(true);
+        handleStartup();
+    }
+
+    private void handleStartup() {
+        if (driver.hasIncomplete()) {
+            try {
+                driver.resumeIncomplete();
+                driveGames(driver.getCurrentGame());
+                updateSolveButton();
+                return;
+            } catch (IOException | SolutionInvalidException e) {
+                JOptionPane.showMessageDialog(this, e.getMessage());
+            }
+        }
+        startNewGame();
     }
 
     private void startNewGame() {
-        DifficultyEnum[] options = DifficultyEnum.values();
-        char diffchar = ' ';
         DifficultyEnum difficulty = (DifficultyEnum) JOptionPane.showInputDialog(
                 this,
                 "Select Difficulty",
                 "New Game",
                 JOptionPane.PLAIN_MESSAGE,
                 null,
-                options,
-                options[0]
+                new DifficultyEnum[]{DifficultyEnum.EASY, DifficultyEnum.MEDIUM, DifficultyEnum.HARD},
+                DifficultyEnum.EASY
         );
 
-        if (difficulty != null) {
-            String[] games = driver.listGames(difficulty.toString().toLowerCase()).toArray(new String[0]);
-            if (games.length == 0) {
-                JOptionPane.showMessageDialog(this, "No puzzles available for " + difficulty);
-                return;
-            }
-            String puzzle = (String) JOptionPane.showInputDialog(
-                    this,
-                    "Select Puzzle",
-                    "New Game",
-                    JOptionPane.PLAIN_MESSAGE,
-                    null,
-                    games,
-                    games[0]
-            );
+        if (difficulty == null) return;
 
-            if (puzzle != null) {
-                try {
-                    switch (difficulty) {
-                        case EASY : diffchar = 'E'; break;
-                        case MEDIUM : diffchar = 'M'; break;
-                        case HARD : diffchar = 'H'; break;
-                    }
-                    driver.startNewGame(diffchar, puzzle);
+        String[] games = driver.listGames(difficulty.toString().toLowerCase()).toArray(new String[0]);
+        if (games.length == 0) {
+            JOptionPane.showMessageDialog(this, "No puzzles available for " + difficulty);
+            return;
+        }
 
-                    boardView.displayBoard(driver.getCurrentGame());
-                    updateSolveButton();
+        String puzzle = (String) JOptionPane.showInputDialog(
+                this,
+                "Select Puzzle",
+                "New Game",
+                JOptionPane.PLAIN_MESSAGE,
+                null,
+                games,
+                games[0]
+        );
+        if (puzzle == null) return;
 
-                } catch (IOException ex) {
-                    JOptionPane.showMessageDialog(this, "Failed to load puzzle: " + ex.getMessage());
-                } catch (InvalidGameException ex){
-                    JOptionPane.showMessageDialog(this, "Invalid Game");
-                }
-            }
+        try {
+            char diffChar = difficulty == DifficultyEnum.EASY ? 'E'
+                    : difficulty == DifficultyEnum.MEDIUM ? 'M' : 'H';
+
+            driver.startNewGame(diffChar, puzzle);
+            driveGames(driver.getCurrentGame());
+            updateSolveButton();
+        } catch (IOException | InvalidGameException | SolutionInvalidException e) {
+            JOptionPane.showMessageDialog(this, e.getMessage());
         }
     }
 
@@ -118,58 +125,124 @@ public class SudokuGUI extends JFrame {
         }
         try {
             driver.resumeIncomplete();
-            boardView.displayBoard(driver.getCurrentGame());
+            driveGames(driver.getCurrentGame());
             updateSolveButton();
-        } catch (IOException e) {
-            JOptionPane.showMessageDialog(this, "Failed to load incomplete game: " + e.getMessage());
+        } catch (IOException | SolutionInvalidException e) {
+            JOptionPane.showMessageDialog(this, e.getMessage());
         }
     }
 
-    private void verifyBoard() {
-       try {
-           boardView.updateBoard(driver.getCurrentGame());
-           boolean valid = driver.verifyBoard(driver.getCurrentGame().getBoard());
-           if (valid) {
-               JOptionPane.showMessageDialog(this, "Board is valid!");
-           }
-           updateSolveButton();
-       } catch (InvalidGameException ex) {
-           JOptionPane.showMessageDialog(this, "Board has errors or incomplete cells.");
-       }
-    }
 
     private void solveBoard() {
-        driver.solveBoard();
-        boardView.displayBoard(driver.getCurrentGame());
+        boardView.updateBoard(driver.getCurrentGame());
+
+        if (!isPartialBoardValid(driver.getCurrentGame())) {
+            JOptionPane.showMessageDialog(this, "Cannot solve: There are invalid numbers on the board.");
+            return;
+        }
+
+        try {
+            solveGame(driver.getCurrentGame());
+            driveGames(driver.getCurrentGame());
+            updateSolveButton();
+        } catch (InvalidGameException | SolutionInvalidException e) {
+            JOptionPane.showMessageDialog(this, e.getMessage());
+        }
+    }
+
+
+    private void verifyBoard() {
+        boardView.updateBoard(driver.getCurrentGame());
+
+        if (isPartialBoardValid(driver.getCurrentGame())) {
+            JOptionPane.showMessageDialog(this, "Sudoku is correct so far!");
+        } else {
+            JOptionPane.showMessageDialog(this, "There are invalid numbers!");
+        }
+
         updateSolveButton();
     }
 
+
     private void saveAndExit() {
         boardView.updateBoard(driver.getCurrentGame());
-        try {
-            driver.saveCurrentGame("Incomplete","board");
-        } catch (IOException e) {
-            JOptionPane.showMessageDialog(this, "Failed to save game: " + e.getMessage());
+        Game game = driver.getCurrentGame();
+
+        if (game.countEmptyCells() == 0) {
+            System.exit(0);
         }
-        System.exit(0);
+
+        if (!isPartialBoardValid(game)) {
+            JOptionPane.showMessageDialog(this,
+                    "Cannot save: The board contains invalid numbers.");
+            return;
+        }
+
+        try {
+            driver.saveCurrentGame("Incomplete", "board");
+            System.exit(0);
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(this, e.getMessage());
+        }
     }
 
-    private int countEmptyCells() {
-        int count = 0;
-        int[][] board = driver.getCurrentGame().getBoard();
-        for (int i = 0; i < 9; i++) {
-            for (int j = 0; j < 9; j++) {
-                if (board[i][j] == 0) count++;
-            }
-        }
-        return count;
-    }
+
+
+
 
     private void updateSolveButton() {
-        solveBtn.setEnabled(countEmptyCells() == 5);
+        Game game = driver.getCurrentGame();
+        solveBtn.setEnabled(game != null && game.countEmptyCells() == 5);
     }
 
-    private Catalog getCatalogue() {
-        return new Catalog();
+    private boolean isPartialBoardValid(Game game) {
+        int[][] current = game.getBoard();
+        int[][] solution = driver.getSolvedGame().getBoard();
+
+        for (int i = 0; i < 9; i++) {
+            for (int j = 0; j < 9; j++) {
+                if (current[i][j] != 0 && current[i][j] != solution[i][j]) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+
+    @Override
+    public Catalog getCatalog() {
+        return catalog;
+    }
+
+    @Override
+    public Game getGame(DifficultyEnum level) throws NotFoundException {
+        return driver.getCurrentGame();
+    }
+
+    @Override
+    public void driveGames(Game source) throws SolutionInvalidException {
+        driver.driveGames(source.getBoard());
+        boardView.displayBoard(driver.getCurrentGame());
+    }
+
+    @Override
+    public String verifyGame(Game game) {
+        try {
+            boolean valid = driver.verifyBoard(game.getBoard());
+            return valid ? "Board is valid!" : "Board is invalid!";
+        } catch (InvalidGameException e) {
+            return "Board has errors or incomplete cells.";
+        }
+    }
+
+    @Override
+    public int[] solveGame(Game game) throws InvalidGameException {
+        driver.solveBoard();
+        return null;
+    }
+
+    @Override
+    public void logUserAction(String userAction) {
     }
 }

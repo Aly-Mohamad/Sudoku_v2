@@ -37,16 +37,21 @@ public class GameDriver implements Controllable {
             default:
                 throw new NotFoundException("Invalid difficulty: " + difficulty);
         }
-        this.solvedGame = loader.loadGame(diff, puzzleName);
+        this.solvedGame = loader.loadGame(diff, puzzleName); // full solution
         verifyBoard(solvedGame.getBoard());
-        driveGames(getGame(difficulty));
 
+        // Save solution for future resume
+        storage.saveGame(solvedGame, "Solution", "solution");
+
+        driveGames(getGame(difficulty));
     }
+
 
     public void resumeIncomplete() throws IOException {
         this.currentGame = loader.loadIncomplete("board");
-        this.solvedGame = currentGame.copy();
+        this.solvedGame = loader.loadGame("solution", "solution");
     }
+
 
     public boolean verifyBoard(int[][] board) {
         SudokuValidator validator = new SudokuValidator(board);
@@ -117,13 +122,27 @@ public class GameDriver implements Controllable {
     @Override
     public boolean[][] verifyGame(int[][] game) {
         boolean[][] valid = new boolean[9][9];
-        SudokuValidator validator = new SudokuValidator(game);
 
         for (int i = 0; i < 9; i++) {
             for (int j = 0; j < 9; j++) {
-                valid[i][j] = validator.isCellValid(i, j);
+                int value = game[i][j];
+
+                if (value == 0) {
+                    valid[i][j] = true;
+                } else {
+                    game[i][j] = 0;
+                    SudokuValidator validator = new SudokuValidator(game);
+                    valid[i][j] = validator.isCellValid(i, j);
+                    game[i][j] = value;
+                }
             }
         }
         return valid;
     }
+
+    public Game getSolvedGame() {
+        return solvedGame;
+    }
+
+
 }

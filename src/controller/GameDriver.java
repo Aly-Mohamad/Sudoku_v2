@@ -10,6 +10,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import model.solver.Solver;
 
 public class GameDriver implements Controllable {
     private Game currentGame;
@@ -17,6 +18,7 @@ public class GameDriver implements Controllable {
     private GameStorage storage;
     private GameLoader loader;
     private GameGenerator generator;
+    private Solver solver = new Solver();
 
     public GameDriver(GameStorage storage) {
         this.storage = storage;
@@ -60,9 +62,29 @@ public class GameDriver implements Controllable {
         else throw new InvalidGameException("Invalid game");
     }
 
-    public void solveBoard() {
-        if (countEmptyCells() == 5 && solvedGame != null) {
-            this.currentGame = solvedGame.copy();
+    public void solveBoard() throws InvalidGameException {
+        if (currentGame == null) {
+            throw new InvalidGameException("No game loaded");
+        }
+
+        if (currentGame.countEmptyCells() != 5) {
+            throw new InvalidGameException("Solve only works with exactly 5 empty cells");
+        }
+
+        if (!solver.isSolvable(currentGame)) {
+            throw new InvalidGameException("Current board has conflicts or is not solvable");
+        }
+
+        int[] solution = solver.solve(currentGame);
+        applySolution(currentGame, solution);
+    }
+
+    private void applySolution(Game game, int[] solution) {
+        for (int i = 0; i < solution.length; i += 3) {
+            int row = solution[i];
+            int col = solution[i + 1];
+            int value = solution[i + 2];
+            game.setValue(row, col, value);
         }
     }
 
@@ -142,6 +164,27 @@ public class GameDriver implements Controllable {
 
     public Game getSolvedGame() {
         return solvedGame;
+    }
+
+    // Update the solveBoard method
+
+
+    @Override
+    public int[][] solveGame(int[][] game) throws InvalidGameException {
+        Game tempGame = new Game(game);
+
+        if (tempGame.countEmptyCells() != 5) {
+            throw new InvalidGameException("Solve only works with exactly 5 empty cells");
+        }
+
+        if (!solver.isSolvable(tempGame)) {
+            throw new InvalidGameException("Current board has conflicts or is not solvable");
+        }
+
+        int[] solution = solver.solve(tempGame);
+        applySolution(tempGame, solution);
+
+        return tempGame.getBoard();
     }
 
 

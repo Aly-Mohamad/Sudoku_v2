@@ -141,12 +141,23 @@ public class SudokuGUI extends JFrame implements Viewable {
             return;
         }
 
+        if (driver.getCurrentGame().countEmptyCells() != 5) {
+            JOptionPane.showMessageDialog(this, "Solve button is only enabled when exactly 5 cells are empty.");
+            return;
+        }
+
         try {
-            solveGame(driver.getCurrentGame());
-            driveGames(driver.getCurrentGame());
+            // Use the solver
+            int[] solution = solveGame(driver.getCurrentGame());
+
+            // Show success message
+            JOptionPane.showMessageDialog(this, "Sudoku solved successfully!");
+
+            // Update UI
+            boardView.displayBoard(driver.getCurrentGame());
             updateSolveButton();
-        } catch (InvalidGameException | SolutionInvalidException e) {
-            JOptionPane.showMessageDialog(this, e.getMessage());
+        } catch (InvalidGameException e) {
+            JOptionPane.showMessageDialog(this, "Failed to solve: " + e.getMessage());
         }
     }
 
@@ -238,8 +249,27 @@ public class SudokuGUI extends JFrame implements Viewable {
 
     @Override
     public int[] solveGame(Game game) throws InvalidGameException {
-        driver.solveBoard();
-        return null;
+        try {
+            // Use the solver
+            model.solver.Solver solver = new model.solver.Solver();
+            int[] solution = solver.solve(game);
+
+            // Apply the solution to the game
+            for (int i = 0; i < solution.length; i += 3) {
+                int row = solution[i];
+                int col = solution[i + 1];
+                int value = solution[i + 2];
+                game.setValue(row, col, value);
+            }
+
+            // Update the board view
+            boardView.displayBoard(game);
+            updateSolveButton();
+
+            return solution;
+        } catch (Exception e) {
+            throw new InvalidGameException("Failed to solve: " + e.getMessage());
+        }
     }
 
     @Override

@@ -17,7 +17,9 @@ public interface Controllable {
 
     boolean[][] verifyGame(int[][] game);
 
-    //int[][] solveGame(int[][] game) throws InvalidGameException;
+    void solveBoard();
+
+    int[][] solveGame(int[][] game) throws InvalidGameException;
 
     //void logUserAction(UserAction userAction) throws IOException;
 }

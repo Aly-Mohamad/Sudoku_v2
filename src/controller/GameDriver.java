@@ -4,6 +4,7 @@ import controller.exceptions.InvalidGameException;
 import controller.exceptions.NotFoundException;
 import controller.exceptions.SolutionInvalidException;
 import controller.interfaces.Controllable;
+import controller.interfaces.Viewable;
 import model.SudokuValidator;
 import model.Game;
 import java.io.File;
@@ -12,7 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import model.solver.Solver;
 
-public class GameDriver implements Controllable {
+public class GameDriver implements Viewable {
     private Game currentGame;
     private Game solvedGame;
     private GameStorage storage;
@@ -30,28 +31,24 @@ public class GameDriver implements Controllable {
         return currentGame;
     }
 
-    public void startNewGame(char difficulty, String puzzleName) throws IOException {
-        String diff;
-        switch (Character.toUpperCase(difficulty)) {
-            case 'E': diff = "easy"; break;
-            case 'M': diff = "medium"; break;
-            case 'H': diff = "hard"; break;
-            default:
-                throw new NotFoundException("Invalid difficulty: " + difficulty);
+    public void startNewGame(DifficultyEnum difficulty, String puzzleName) throws IOException {
+        try {
+            this.solvedGame = getGame(difficulty);
+            driveGames(solvedGame);
+            verifyBoard(solvedGame.getBoard());
+
+            // Save solution for future resume
+            storage.saveGame(solvedGame, "Solution", "solution");
+
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
-        this.solvedGame = loader.loadGame(diff, puzzleName); // full solution
-        verifyBoard(solvedGame.getBoard());
-
-        // Save solution for future resume
-        storage.saveGame(solvedGame, "Solution", "solution");
-
-        driveGames(getGame(difficulty));
     }
 
 
     public void resumeIncomplete() throws IOException {
-        this.currentGame = loader.loadIncomplete("board");
-        this.solvedGame = loader.loadGame("solution", "solution");
+        this.currentGame = loader.loadIncomplete();
+        this.solvedGame = loader.loadGame("solution");
     }
 
 
@@ -107,6 +104,10 @@ public class GameDriver implements Controllable {
         return names;
     }
 
+    public Game getSolvedGame() {
+        return solvedGame;
+    }
+
     private int countEmptyCells() {
         int count = 0;
         int[][] boardArr = currentGame.getBoard();
@@ -122,69 +123,102 @@ public class GameDriver implements Controllable {
     }
 
     @Override
-    public int[][] getGame(char level) throws NotFoundException {
-        DifficultyEnum diff;
-
-        switch (Character.toUpperCase(level)) {
-            case 'E': diff = DifficultyEnum.EASY; break;
-            case 'M': diff = DifficultyEnum.MEDIUM; break;
-            case 'H': diff = DifficultyEnum.HARD; break;
-            default:
-                throw new NotFoundException("Invalid difficulty: " + level);
+    public Game getGame(DifficultyEnum level) throws NotFoundException {
+        try {
+            return loader.loadGame(level.toString().toLowerCase());
+        } catch (IOException e) {
+            throw new NotFoundException(e.getMessage());
         }
-
-        return generator.generate(solvedGame, diff).getBoard();
     }
 
     @Override
-    public void driveGames(int[][] source) {
-        this.currentGame = new Game(source);
-    }
-
-    @Override
-    public boolean[][] verifyGame(int[][] game) {
-        boolean[][] valid = new boolean[9][9];
-
-        for (int i = 0; i < 9; i++) {
-            for (int j = 0; j < 9; j++) {
-                int value = game[i][j];
-
-                if (value == 0) {
-                    valid[i][j] = true;
-                } else {
-                    game[i][j] = 0;
-                    SudokuValidator validator = new SudokuValidator(game);
-                    valid[i][j] = validator.isCellValid(i, j);
-                    game[i][j] = value;
-                }
-            }
+    public void driveGames(Game sourceGame) throws SolutionInvalidException{
+        try {
+            this.currentGame = generator.generate(solvedGame, sourceGame.getDifficulty());
+        } catch (Exception e) {
+            throw new SolutionInvalidException(e.getMessage());
         }
-        return valid;
     }
 
-    public Game getSolvedGame() {
-        return solvedGame;
+
+    //--------------------------NEED TO USE-----------------------------------
+    @Override
+    public String verifyGame(Game game) {
+        try {
+            boolean valid = verifyBoard(game.getBoard());
+            return valid ? "Board is valid!" : "Board is invalid!";
+        } catch (InvalidGameException e) {
+            return "Board has errors or incomplete cells.";
+        }
     }
+
+//    @Override
+//    public boolean[][] verifyGame(int[][] game) {
+//        boolean[][] valid = new boolean[9][9];
+//
+//        for (int i = 0; i < 9; i++) {
+//            for (int j = 0; j < 9; j++) {
+//                int value = game[i][j];
+//
+//                if (value == 0) {
+//                    valid[i][j] = true;
+//                } else {
+//                    game[i][j] = 0;
+//                    SudokuValidator validator = new SudokuValidator(game);
+//                    valid[i][j] = validator.isCellValid(i, j);
+//                    game[i][j] = value;
+//                }
+//            }
+//        }
+//        return valid;
+//    }
+
+
 
     // Update the solveBoard method
 
 
+//    @Override
+//    public int[][] solveGame(int[][] game) throws InvalidGameException {
+//        Game tempGame = new Game(game);
+//
+//        if (tempGame.countEmptyCells() != 5) {
+//            throw new InvalidGameException("Solve only works with exactly 5 empty cells");
+//        }
+//
+//        if (!solver.isSolvable(tempGame)) {
+//            throw new InvalidGameException("Current board has conflicts or is not solvable");
+//        }
+//
+//        int[] solution = solver.solve(tempGame);
+//        applySolution(tempGame, solution);
+//
+//        return tempGame.getBoard();
+//    }
+
     @Override
-    public int[][] solveGame(int[][] game) throws InvalidGameException {
-        Game tempGame = new Game(game);
+    public int[] solveGame(Game game) throws InvalidGameException {
+        try {
+            // Use the solver
+            model.solver.Solver solver = new model.solver.Solver();
+            int[] solution = solver.solve(game);
 
-        if (tempGame.countEmptyCells() != 5) {
-            throw new InvalidGameException("Solve only works with exactly 5 empty cells");
+            // Apply the solution to the game
+            for (int i = 0; i < solution.length; i += 3) {
+                int row = solution[i];
+                int col = solution[i + 1];
+                int value = solution[i + 2];
+                game.setValue(row, col, value);
+            }
+
+//            // Update the board view
+//            boardView.displayBoard(game);
+//            updateSolveButton();
+
+            return solution;
+        } catch (Exception e) {
+            throw new InvalidGameException("Failed to solve: " + e.getMessage());
         }
-
-        if (!solver.isSolvable(tempGame)) {
-            throw new InvalidGameException("Current board has conflicts or is not solvable");
-        }
-
-        int[] solution = solver.solve(tempGame);
-        applySolution(tempGame, solution);
-
-        return tempGame.getBoard();
     }
 
 

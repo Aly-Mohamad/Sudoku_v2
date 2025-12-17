@@ -84,17 +84,17 @@ public class GameBoardView extends JPanel {
         this.listener = l;
     }
 
-    public void displayBoard(Game game) {
-        int[][] b = game.getBoard();
+    public void displayBoard(int[][] game) {
+        //int[][] b = game.getBoard();
         for (int i = 0; i < 9; i++) {
             for (int j = 0; j < 9; j++) {
                 if (cells[i][j] == null) continue;
-                if (b[i][j] == 0) {
+                if (game[i][j] == 0) {
                     cells[i][j].setText("");
                     cells[i][j].setEditable(true);
                     cells[i][j].setBackground(Color.WHITE);
                 } else {
-                    cells[i][j].setText(String.valueOf(b[i][j]));
+                    cells[i][j].setText(String.valueOf(game[i][j]));
                     cells[i][j].setEditable(false);
                     cells[i][j].setBackground(Color.LIGHT_GRAY);
                 }
@@ -116,4 +116,50 @@ public class GameBoardView extends JPanel {
             }
         }
     }
+
+    public int[][] getBoard() {
+        int[][] board = new int[9][9];
+
+        for (int i = 0; i < 9; i++) {
+            for (int j = 0; j < 9; j++) {
+                String text = cells[i][j].getText();
+                if (text != null && !text.isEmpty()) {
+                    try {
+                        board[i][j] = Integer.parseInt(text);
+                    } catch (NumberFormatException e) {
+                        board[i][j] = 0;
+                    }
+                } else {
+                    board[i][j] = 0;
+                }
+            }
+        }
+        return board;
+    }
+
+    public void highlightValidity(boolean[][] valid) {
+        for (int i = 0; i < 9; i++) {
+            for (int j = 0; j < 9; j++) {
+
+                // Skip empty cells
+                if (cells[i][j].getText().isEmpty()) {
+                    cells[i][j].setBackground(Color.WHITE);
+                    continue;
+                }
+
+                if (valid[i][j]) {
+                    // Keep original background
+                    if (cells[i][j].isEditable()) {
+                        cells[i][j].setBackground(Color.WHITE);
+                    } else {
+                        cells[i][j].setBackground(Color.LIGHT_GRAY);
+                    }
+                } else {
+                    // Invalid cell
+                    cells[i][j].setBackground(new Color(255, 150, 150));
+                }
+            }
+        }
+    }
+
 }

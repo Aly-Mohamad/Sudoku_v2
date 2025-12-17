@@ -9,15 +9,13 @@ import controller.exceptions.SolutionInvalidException;
 import java.io.IOException;
 
 public interface Controllable {
-    Catalog getCatalog();
+    boolean[] getCatalog();
 
     int[][] getGame(char level) throws NotFoundException;
 
-    void driveGames(int[][] source) throws SolutionInvalidException;
+    void driveGames(String sourcePath) throws SolutionInvalidException;
 
     boolean[][] verifyGame(int[][] game);
-
-    void solveBoard();
 
     int[][] solveGame(int[][] game) throws InvalidGameException;
 

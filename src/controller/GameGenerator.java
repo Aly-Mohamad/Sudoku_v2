@@ -12,6 +12,7 @@ public class GameGenerator {
     public Game generate(Game solved, DifficultyEnum difficulty) {
 
         int eraseCount;
+
         switch (difficulty) {
             case EASY: eraseCount = 10; break;
             case MEDIUM: eraseCount = 20; break;

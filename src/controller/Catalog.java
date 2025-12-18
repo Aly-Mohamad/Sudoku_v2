@@ -15,21 +15,25 @@ public class Catalog {
     }
 
     private final List<String> difficultyFolders = Arrays.asList("easy", "medium", "hard");
-    private final String incompleteFolder = "Incomplete";
+    private final String incompleteFolder = "incomplete";
     private final String baseFolder = "storage";
 
     private boolean checkForCurrentGame() {
-        File folder = new File(baseFolder + "/" + incompleteFolder);
+        try {
+            File folder = new File(baseFolder + "/" + incompleteFolder);
 
-        if (!folder.exists() || !folder.isDirectory()) {
-            throw new NotFoundException("Folder not found");
+            if (!folder.exists() || !folder.isDirectory()) {
+                return false;
+            }
+
+            File[] files = folder.listFiles((dir, name) ->
+                    name.toLowerCase().endsWith(".csv")
+            );
+
+            return files != null && files.length > 0;
+        } catch (Exception e) {
+            return false;
         }
-
-        File[] files = folder.listFiles((dir, name) ->
-                name.toLowerCase().endsWith(".csv")
-        );
-
-        return files != null && files.length > 0;
     }
 
     private boolean checkAllModesExist() {

@@ -20,5 +20,7 @@ public interface Viewable {
 
     int[] solveGame(Game game) throws InvalidGameException;
 
+    Game getCurrentGame();
+
     //void logUserAction(String userAction) throws IOException;
 }

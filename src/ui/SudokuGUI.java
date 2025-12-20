@@ -8,11 +8,12 @@ import controller.exceptions.InvalidGameException;
 import controller.exceptions.NotFoundException;
 import controller.exceptions.SolutionInvalidException;
 import controller.interfaces.Viewable;
-import model.*;
+import model.Game;
 
 import javax.swing.*;
 import java.awt.*;
 import java.io.IOException;
+import java.util.List;
 
 public class SudokuGUI extends JFrame implements Viewable {
 
@@ -20,8 +21,10 @@ public class SudokuGUI extends JFrame implements Viewable {
     private GameBoardView boardView;
     private JButton solveBtn;
     private Catalog catalog = new Catalog();
+    private GameStorage storage;
 
     public SudokuGUI(GameStorage storage) {
+        this.storage = storage;
         driver = new GameDriver(storage);
 
         setTitle("Sudoku");
@@ -31,7 +34,20 @@ public class SudokuGUI extends JFrame implements Viewable {
         setLayout(new BorderLayout());
 
         boardView = new GameBoardView();
-        boardView.setCellChangeListener(this::updateSolveButton);
+        boardView.setCellChangeListener((row, col, newVal, ignoredPrevVal) -> {
+            Game game = driver.getCurrentGame();
+            int oldVal = game.getValue(row, col); // true previous value
+
+            if (newVal != oldVal) {
+                try {
+                    storage.appendLog("(" + row + "," + col + "," + newVal + "," + oldVal + ")");
+                } catch (IOException e) {
+                    JOptionPane.showMessageDialog(this, "Failed to log action: " + e.getMessage());
+                }
+                game.setValue(row, col, newVal); // update board
+                updateSolveButton();
+            }
+        });
         add(boardView, BorderLayout.CENTER);
 
         JPanel buttonPanel = new JPanel(new FlowLayout());
@@ -41,6 +57,7 @@ public class SudokuGUI extends JFrame implements Viewable {
         JButton verifyBtn = new JButton("Verify");
         solveBtn = new JButton("Solve");
         JButton saveBtn = new JButton("Save & Exit");
+        JButton undoBtn = new JButton("Undo");
 
         solveBtn.setEnabled(false);
 
@@ -49,6 +66,7 @@ public class SudokuGUI extends JFrame implements Viewable {
         buttonPanel.add(verifyBtn);
         buttonPanel.add(solveBtn);
         buttonPanel.add(saveBtn);
+        buttonPanel.add(undoBtn);
 
         add(buttonPanel, BorderLayout.SOUTH);
 
@@ -57,11 +75,38 @@ public class SudokuGUI extends JFrame implements Viewable {
         verifyBtn.addActionListener(e -> verifyBoard());
         solveBtn.addActionListener(e -> solveBoard());
         saveBtn.addActionListener(e -> saveAndExit());
+        undoBtn.addActionListener(e -> undoLastAction());
 
         setVisible(true);
         handleStartup();
     }
 
+    // --- Undo implementation ---
+    private void undoLastAction() {
+        try {
+            List<String> logs = storage.readLogLines();
+            if (logs.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "No more actions to undo.");
+                return;
+            }
+
+            String last = logs.get(logs.size() - 1);
+            last = last.replaceAll("[()]", "");
+            String[] parts = last.split(",");
+            int row = Integer.parseInt(parts[0].trim());
+            int col = Integer.parseInt(parts[1].trim());
+            int prevVal = Integer.parseInt(parts[3].trim());
+
+            driver.getCurrentGame().setValue(row, col, prevVal);
+            storage.removeLastLogEntry();
+            boardView.displayBoard(driver.getCurrentGame());
+
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(this, "Undo failed: " + ex.getMessage());
+        }
+    }
+
+    // --- Startup logic ---
     private void handleStartup() {
         if (driver.hasIncomplete()) {
             try {
@@ -76,6 +121,7 @@ public class SudokuGUI extends JFrame implements Viewable {
         startNewGame();
     }
 
+    // --- Game actions ---
     private void startNewGame() {
         DifficultyEnum difficulty = (DifficultyEnum) JOptionPane.showInputDialog(
                 this,
@@ -132,7 +178,6 @@ public class SudokuGUI extends JFrame implements Viewable {
         }
     }
 
-
     private void solveBoard() {
         boardView.updateBoard(driver.getCurrentGame());
 
@@ -150,7 +195,6 @@ public class SudokuGUI extends JFrame implements Viewable {
         }
     }
 
-
     private void verifyBoard() {
         boardView.updateBoard(driver.getCurrentGame());
 
@@ -162,7 +206,6 @@ public class SudokuGUI extends JFrame implements Viewable {
 
         updateSolveButton();
     }
-
 
     private void saveAndExit() {
         boardView.updateBoard(driver.getCurrentGame());
@@ -186,10 +229,7 @@ public class SudokuGUI extends JFrame implements Viewable {
         }
     }
 
-
-
-
-
+    // --- Helper methods ---
     private void updateSolveButton() {
         Game game = driver.getCurrentGame();
         solveBtn.setEnabled(game != null && game.countEmptyCells() == 5);
@@ -209,11 +249,9 @@ public class SudokuGUI extends JFrame implements Viewable {
         return true;
     }
 
-
+    // --- Viewable interface methods ---
     @Override
-    public Catalog getCatalog() {
-        return catalog;
-    }
+    public Catalog getCatalog() { return catalog; }
 
     @Override
     public Game getGame(DifficultyEnum level) throws NotFoundException {
@@ -243,6 +281,5 @@ public class SudokuGUI extends JFrame implements Viewable {
     }
 
     @Override
-    public void logUserAction(String userAction) {
-    }
+    public void logUserAction(String userAction) { }
 }

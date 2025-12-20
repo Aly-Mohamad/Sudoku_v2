@@ -1,7 +1,6 @@
 package ui;
 
 import model.Game;
-
 import javax.swing.*;
 import javax.swing.border.Border;
 import javax.swing.border.MatteBorder;
@@ -17,7 +16,7 @@ public class GameBoardView extends JPanel {
     private CellChangeListener listener;
 
     public interface CellChangeListener {
-        void cellChanged();
+        void cellChanged(int row, int col, int newVal, int prevVal);
     }
 
     public GameBoardView() {
@@ -39,13 +38,12 @@ public class GameBoardView extends JPanel {
                 final int row = i;
                 final int col = j;
 
-                // DocumentFilter to allow only digits 1-9
                 ((AbstractDocument) cell.getDocument()).setDocumentFilter(new DocumentFilter() {
                     @Override
                     public void insertString(FilterBypass fb, int offset, String string, AttributeSet attr) throws BadLocationException {
                         if (isValidInput(fb.getDocument().getLength(), string)) {
                             super.insertString(fb, offset, string, attr);
-                            notifyChange();
+                            notifyChange(row, col);
                         }
                     }
 
@@ -53,26 +51,29 @@ public class GameBoardView extends JPanel {
                     public void replace(FilterBypass fb, int offset, int length, String text, AttributeSet attrs) throws BadLocationException {
                         if (isValidInput(fb.getDocument().getLength() - length, text)) {
                             super.replace(fb, offset, length, text, attrs);
-                            notifyChange();
+                            notifyChange(row, col);
                         }
                     }
 
                     @Override
                     public void remove(FilterBypass fb, int offset, int length) throws BadLocationException {
                         super.remove(fb, offset, length);
-                        notifyChange();
+                        notifyChange(row, col);
                     }
 
                     private boolean isValidInput(int currentLength, String text) {
-                        // Only allow a single character and it must be 1-9
                         return (currentLength + text.length() <= 1) && text.matches("[1-9]?");
                     }
 
-                    private void notifyChange() {
-                        if (listener != null) listener.cellChanged();
+                    private void notifyChange(int r, int c) {
+                        if (listener != null) {
+                            String text = cells[r][c].getText();
+                            int newVal = text.isEmpty() ? 0 : Integer.parseInt(text);
+                            // Pass newVal; prevVal will be determined in SudokuGUI
+                            listener.cellChanged(r, c, newVal, 0);
+                        }
                     }
                 });
-
 
                 cells[i][j] = cell;
                 add(cell);
@@ -88,7 +89,6 @@ public class GameBoardView extends JPanel {
         int[][] b = game.getBoard();
         for (int i = 0; i < 9; i++) {
             for (int j = 0; j < 9; j++) {
-                if (cells[i][j] == null) continue;
                 if (b[i][j] == 0) {
                     cells[i][j].setText("");
                     cells[i][j].setEditable(true);
@@ -103,10 +103,8 @@ public class GameBoardView extends JPanel {
     }
 
     public void updateBoard(Game game) {
-        if (cells == null) return;
         for (int i = 0; i < 9; i++) {
             for (int j = 0; j < 9; j++) {
-                if (cells[i][j] == null) continue;
                 String text = cells[i][j].getText();
                 int val = 0;
                 if (!text.isEmpty()) {

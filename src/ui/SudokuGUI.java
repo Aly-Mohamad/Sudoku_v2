@@ -1,10 +1,8 @@
 package ui;
 
 import controller.*;
-import controller.DifficultyEnum;
-import controller.exceptions.InvalidGameException;
-import controller.interfaces.Controllable;
-import controller.GameControllerAdapter;
+import controller.exceptions.*;
+import controller.interfaces.*;
 import model.Game;
 
 import javax.swing.*;

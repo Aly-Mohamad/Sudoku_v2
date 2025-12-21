@@ -5,11 +5,10 @@ import model.Game;
 
 public class GameStorage {
     private static final String BASE = "storage";
-    private static final String INCOMPLETE = "incomplete";
+    private static final String INCOMPLETE = "Incomplete";
 
     public void saveGame(Game game, String mode, String fileName) throws IOException {
         File file = new File(BASE + "/" + mode + "/" + fileName + ".csv");
-        file.getParentFile().mkdirs();
 
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
             for (int i = 0; i < 9; i++) {

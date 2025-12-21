@@ -57,4 +57,39 @@ public class GameLoader {
     public Game loadIncomplete() throws IOException {
         return loadGame("incomplete");
     }
+    
+    public Game loadSpecificFile(String mode, String fileName) throws IOException {
+        File file = new File("storage/" + mode.toLowerCase() + "/" + fileName + ".csv");
+        if (!file.exists()) {
+            throw new FileNotFoundException("File not found: " + file.getAbsolutePath());
+        }
+        
+        int[][] board = new int[9][9];
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            for (int i = 0; i < 9; i++) {
+                String line = reader.readLine();
+                if (line == null) {
+                    throw new IOException("Invalid file format: " + file.getName());
+                }
+                String[] parts = line.split(",");
+                if (parts.length != 9) {
+                    throw new IOException("Invalid row format in: " + file.getName());
+                }
+                for (int j = 0; j < 9; j++) {
+                    board[i][j] = Integer.parseInt(parts[j]);
+                }
+            }
+        }
+        
+        DifficultyEnum diff;
+        switch (mode.toLowerCase()) {
+            case "easy": diff = DifficultyEnum.EASY; break;
+            case "medium": diff = DifficultyEnum.MEDIUM; break;
+            case "hard": diff = DifficultyEnum.HARD; break;
+            case "incomplete": diff = DifficultyEnum.INCOMPLETE; break;
+            default: diff = DifficultyEnum.INCOMPLETE; break;
+        }
+        
+        return new Game(board, diff);
+    }
 }

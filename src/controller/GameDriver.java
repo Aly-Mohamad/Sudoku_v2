@@ -35,18 +35,16 @@ public class GameDriver implements Viewable {
             this.solvedGame = getGame(difficulty);
             driveGames(solvedGame);
             verifyBoard(solvedGame.getBoard());
-
-            // Save solution for future resume
-            storage.saveGame(solvedGame, "solution", "solution");
-
+            // Solution is kept in memory - will be saved when saving incomplete game
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
 
     public void resumeIncomplete() throws IOException {
-        this.currentGame = loader.loadIncomplete();
-        this.solvedGame = loader.loadGame("solution");
+        // Load both current game and solution from incomplete folder
+        this.currentGame = loader.loadSpecificFile("incomplete", "board");
+        this.solvedGame = loader.loadSpecificFile("incomplete", "solution");
     }
 
     public boolean verifyBoard(int[][] board) {
@@ -84,6 +82,10 @@ public class GameDriver implements Viewable {
 
     public void saveCurrentGame(String mode, String fileName) throws IOException {
         storage.saveGame(currentGame, mode, fileName);
+        // When saving incomplete game, also save the solution in the same folder
+        if ("incomplete".equalsIgnoreCase(mode) && solvedGame != null) {
+            storage.saveGame(solvedGame, mode, "solution");
+        }
     }
 
     public boolean hasIncomplete() {
@@ -133,9 +135,7 @@ public class GameDriver implements Viewable {
         try {
             this.solvedGame = sourceGame;
             this.currentGame = generator.generate(sourceGame, sourceGame.getDifficulty());
-
-            // Ensure a solution exists on disk so resume works across restarts
-            storage.saveGame(this.solvedGame, "solution", "solution");
+            // Solution is kept in memory - will be saved when saving incomplete game
         } catch (Exception e) {
             throw new SolutionInvalidException(e.getMessage());
         }

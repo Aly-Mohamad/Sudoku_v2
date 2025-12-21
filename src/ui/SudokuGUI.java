@@ -373,6 +373,7 @@ public class SudokuGUI extends JFrame {
 
         try {
             driver.saveCurrentGame("incomplete", "board");
+            storage.clearLog();
             System.exit(0);
         } catch (IOException e) {
             JOptionPane.showMessageDialog(this, e.getMessage());

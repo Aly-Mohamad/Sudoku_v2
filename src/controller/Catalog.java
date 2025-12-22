@@ -15,7 +15,7 @@ public class Catalog {
     }
 
     private final List<String> difficultyFolders = Arrays.asList("easy", "medium", "hard");
-    private final String incompleteFolder = "incomplete";
+    private final String incompleteFolder = "Incomplete"; // Match GameStorage constant
     private final String baseFolder = "storage";
 
     private boolean checkForCurrentGame() {
@@ -67,5 +67,13 @@ public class Catalog {
 
     public boolean isAllModesExist() {
         return allModesExist;
+    }
+    
+    /**
+     * Checks if any difficulty level is missing games.
+     * @return true if at least one difficulty level has no games
+     */
+    public boolean hasAnyModeMissing() {
+        return !allModesExist;
     }
 }

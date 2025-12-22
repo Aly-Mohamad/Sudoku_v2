@@ -6,6 +6,7 @@ import controller.exceptions.SolutionInvalidException;
 import controller.interfaces.Controllable;
 import controller.interfaces.Viewable;
 import model.Game;
+import java.io.IOException;
 
 public class GameControllerAdapter implements Controllable {
 
@@ -24,10 +25,11 @@ public class GameControllerAdapter implements Controllable {
         try {
             Catalog catalog = driver.getCatalog();
             result[0] = catalog.isCurrent();
-            result[1] = catalog.isAllModesExist();
+            // Check if any mode is missing games (instead of requiring all modes to exist)
+            result[1] = catalog.hasAnyModeMissing();
         } catch (Exception e) {
             result[0] = false;
-            result[1] = false;
+            result[1] = true; // If error, assume modes are missing
         }
         return result;
     }
@@ -90,7 +92,7 @@ public class GameControllerAdapter implements Controllable {
             for (int c = startCol; c < startCol + 3; c++) {
                 if ((r != row || c != col) && board[r][c] == val) return false;
             }
-        }
+        }   
         return true;
     }
 
@@ -99,5 +101,10 @@ public class GameControllerAdapter implements Controllable {
         currentGame = new Game(board);
         driver.solveGame(currentGame);
         return currentGame.getBoard();
+    }
+
+    @Override
+    public void logUserAction(UserAction userAction) throws IOException {
+        driver.logUserAction(userAction.toLogString());
     }
 }

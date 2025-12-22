@@ -2,6 +2,7 @@ package ui;
 
 import controller.GameDriver;
 import controller.GameStorage;
+import controller.GameLoader;
 import controller.DifficultyEnum;
 import controller.exceptions.InvalidGameException;
 import controller.interfaces.Controllable;
@@ -10,6 +11,7 @@ import model.Game;
 
 import javax.swing.*;
 import java.awt.*;
+import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
@@ -25,7 +27,7 @@ public class SudokuGUI extends JFrame {
     public SudokuGUI(GameStorage storage) {
         this.storage = storage;
         driver = new GameDriver(storage);
-        this.controller = new GameControllerAdapter(driver);
+        this.controller = new   GameControllerAdapter(driver);
 
         setTitle("Sudoku");
         setSize(600, 700);
@@ -48,12 +50,16 @@ public class SudokuGUI extends JFrame {
             // Only log actual user changes (not when value is the same)
             if (newVal != oldVal) {
                 try {
-                    storage.appendLog("(" + row + "," + col + "," + newVal + "," + oldVal + ")");
+                    // Use controller interface to log user action (proper MVC architecture)
+                    controller.logUserAction(new controller.UserAction(row, col, newVal, oldVal));
                 } catch (IOException e) {
                     JOptionPane.showMessageDialog(this, "Failed to log action: " + e.getMessage());
                 }
                 game.setValue(row, col, newVal); // update board
                 updateSolveButton();
+                
+                // Check if game is completed and valid - if so, delete incomplete game
+                checkAndDeleteIfCompleted(game);
             }
         });
         add(boardView, BorderLayout.CENTER);
@@ -142,6 +148,16 @@ public class SudokuGUI extends JFrame {
     // --- Startup logic ---
     private void handleStartup() {
         boolean[] catalog = controller.getCatalog();
+        
+        // First, check if any difficulty level is missing games
+        // This check should happen regardless of incomplete game status
+        if (catalog[1]) {
+            // At least one mode is missing games - ask user to provide a solved Sudoku game file
+            requestSolvedGameFile();
+            return;
+        }
+        
+        // Check if there is an unfinished game (only if all modes have games)
         if (catalog[0]) {
             try {
                 driver.resumeIncomplete();
@@ -178,7 +194,86 @@ public class SudokuGUI extends JFrame {
                 JOptionPane.showMessageDialog(this, "Failed to resume incomplete game: " + e.getMessage());
             }
         }
+        
+        // All modes have games and no incomplete game - proceed with normal game selection
         startNewGame();
+    }
+    
+    /**
+     * Shows a file chooser dialog asking the user to provide a solved Sudoku game file.
+     * Once provided, generates all difficulty levels and saves them.
+     */
+    private void requestSolvedGameFile() {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Select a Solved Sudoku Game File");
+        fileChooser.setFileFilter(new javax.swing.filechooser.FileFilter() {
+            @Override
+            public boolean accept(File f) {
+                return f.isDirectory() || f.getName().toLowerCase().endsWith(".csv");
+            }
+            
+            @Override
+            public String getDescription() {
+                return "CSV Files (*.csv)";
+            }
+        });
+        
+        int result = fileChooser.showOpenDialog(this);
+        if (result == JFileChooser.APPROVE_OPTION) {
+            File selectedFile = fileChooser.getSelectedFile();
+            try {
+                // Load the game from the selected file
+                GameLoader loader = new GameLoader();
+                Game sourceGame = loader.loadGameFromPath(selectedFile.getAbsolutePath());
+                
+                // Verify it's a valid solved game
+                try {
+                    driver.verifyBoard(sourceGame.getBoard());
+                } catch (InvalidGameException e) {
+                    JOptionPane.showMessageDialog(this, 
+                        "The selected file does not contain a valid solved Sudoku game.\n" +
+                        "Please select a file with a complete, valid Sudoku solution.",
+                        "Invalid Game", JOptionPane.ERROR_MESSAGE);
+                    requestSolvedGameFile(); // Ask again
+                    return;
+                }
+                
+                // Generate and save all difficulty levels
+                driver.generateAllDifficultyLevels(sourceGame);
+                
+                JOptionPane.showMessageDialog(this, 
+                    "Successfully generated games for all difficulty levels!\n" +
+                    "You can now start a new game.",
+                    "Games Generated", JOptionPane.INFORMATION_MESSAGE);
+                
+                // Now proceed with normal game selection
+                startNewGame();
+                
+            } catch (IOException e) {
+                JOptionPane.showMessageDialog(this, 
+                    "Error reading file: " + e.getMessage() + "\nPlease try again.",
+                    "File Error", JOptionPane.ERROR_MESSAGE);
+                requestSolvedGameFile(); // Ask again
+            } catch (Exception e) {
+                JOptionPane.showMessageDialog(this, 
+                    "Error generating games: " + e.getMessage() + "\nPlease try again.",
+                    "Generation Error", JOptionPane.ERROR_MESSAGE);
+                requestSolvedGameFile(); // Ask again
+            }
+        } else {
+            // User cancelled - exit the application
+            int response = JOptionPane.showConfirmDialog(this,
+                "No games are available and no file was provided.\n" +
+                "Would you like to exit the application?",
+                "Exit Application?",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE);
+            if (response == JOptionPane.YES_OPTION) {
+                System.exit(0);
+            } else {
+                requestSolvedGameFile(); // Ask again
+            }
+        }
     }
 
     private void startNewGame() {
@@ -282,22 +377,31 @@ public class SudokuGUI extends JFrame {
         }
 
         try {
-            int[][] solved = controller.solveGame(driver.getCurrentGame().getBoard());
+            Game currentGame = driver.getCurrentGame();
+            int[][] solved = controller.solveGame(currentGame.getBoard());
             // When solved, all cells should be non-editable (they're all "original" now)
             int[][] solvedAsInitial = new int[9][9];
             for (int i = 0; i < 9; i++) {
                 System.arraycopy(solved[i], 0, solvedAsInitial[i], 0, 9);
             }
             
-            // Update board without triggering log events
+            // Update the current game with solved values
             isUpdatingBoard = true;
             try {
-                boardView.displayBoard(new Game(solved), solvedAsInitial);
+                for (int i = 0; i < 9; i++) {
+                    for (int j = 0; j < 9; j++) {
+                        currentGame.setValue(i, j, solved[i][j]);
+                    }
+                }
+                boardView.displayBoard(currentGame, solvedAsInitial);
             } finally {
                 isUpdatingBoard = false;
             }
             JOptionPane.showMessageDialog(this, "Solved successfully!");
             updateSolveButton();
+            
+            // Check if game is completed and delete if valid
+            checkAndDeleteIfCompleted(currentGame);
         } catch (InvalidGameException e) {
             JOptionPane.showMessageDialog(this, "Failed to solve: " + e.getMessage());
         }
@@ -351,6 +455,15 @@ public class SudokuGUI extends JFrame {
             JOptionPane.showMessageDialog(this, "Conflicts highlighted in red.");
         } else if (isComplete) {
             JOptionPane.showMessageDialog(this, "Board is complete and correct!");
+            // According to PDF: If a game becomes completely filled and is verified as valid, 
+            // it must be removed permanently (deleted)
+            try {
+                storage.deleteIncomplete();
+                storage.clearLog();
+                JOptionPane.showMessageDialog(this, "Game completed! Incomplete game has been removed.");
+            } catch (IOException e) {
+                JOptionPane.showMessageDialog(this, "Warning: Could not delete incomplete game: " + e.getMessage());
+            }
         } else {
             JOptionPane.showMessageDialog(this, "No conflicts so far.");
         }
@@ -361,19 +474,26 @@ public class SudokuGUI extends JFrame {
         boardView.updateBoard(driver.getCurrentGame());
         Game game = driver.getCurrentGame();
 
+        // If game is complete, check if valid and handle accordingly
         if (game.countEmptyCells() == 0) {
+            checkAndDeleteIfCompleted(game);
             System.exit(0);
         }
 
+        // Game has zeros (incomplete) - validate before saving
         if (!isPartialBoardValid(game)) {
             JOptionPane.showMessageDialog(this,
                     "Cannot save: The board contains invalid numbers.");
             return;
         }
 
+        // Only save if game has zeros (incomplete)
+        // Don't save complete games as incomplete
         try {
-            driver.saveCurrentGame("incomplete", "board");
-            storage.clearLog();
+            if (game.countEmptyCells() > 0) {
+                driver.saveCurrentGame("incomplete", "board");
+                storage.clearLog();
+            }
             System.exit(0);
         } catch (IOException e) {
             JOptionPane.showMessageDialog(this, e.getMessage());
@@ -384,6 +504,64 @@ public class SudokuGUI extends JFrame {
     void updateSolveButton() {
         Game game = driver.getCurrentGame();
         solveBtn.setEnabled(game != null && game.countEmptyCells() == 5);
+    }
+    
+    /**
+     * Checks if the game is completed and valid. If so, saves it as a valid sudoku and deletes the incomplete game.
+     * This is called after each cell change and when saving/exiting.
+     */
+    private void checkAndDeleteIfCompleted(Game game) {
+        if (game == null || game.countEmptyCells() != 0) {
+            return; // Game is not complete
+        }
+        
+        // Check if the completed game matches the solution
+        Game solved = driver.getSolvedGame();
+        if (solved == null) {
+            return; // No solution available
+        }
+        
+        int[][] current = game.getBoard();
+        int[][] solution = solved.getBoard();
+        
+        // Verify all cells match the solution
+        boolean isValid = true;
+        for (int i = 0; i < 9; i++) {
+            for (int j = 0; j < 9; j++) {
+                if (current[i][j] != solution[i][j]) {
+                    isValid = false;
+                    break;
+                }
+            }
+            if (!isValid) break;
+        }
+        
+        // If game is complete and valid, save it as a valid sudoku (no zeros) and delete incomplete
+        if (isValid) {
+            try {
+                // Save the completed game as a valid sudoku solution
+                // Create a "solved" folder if it doesn't exist
+                java.io.File solvedDir = new java.io.File("storage/solved");
+                if (!solvedDir.exists()) {
+                    solvedDir.mkdirs();
+                }
+                
+                // Save with timestamp to avoid overwriting
+                String fileName = "completed_" + System.currentTimeMillis();
+                storage.saveGame(game, "solved", fileName);
+                
+                // Delete incomplete game and log
+                storage.deleteIncomplete();
+                storage.clearLog();
+                JOptionPane.showMessageDialog(this, 
+                    "Congratulations! Game completed successfully!\n" +
+                    "Saved as valid sudoku solution.",
+                    "Game Completed", JOptionPane.INFORMATION_MESSAGE);
+            } catch (IOException e) {
+                JOptionPane.showMessageDialog(this, 
+                    "Warning: Could not save completed game: " + e.getMessage());
+            }
+        }
     }
 
     private boolean isPartialBoardValid(Game game) {

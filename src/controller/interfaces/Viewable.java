@@ -22,5 +22,5 @@ public interface Viewable {
 
     Game getCurrentGame();
 
-    //void logUserAction(String userAction) throws IOException;
+    void logUserAction(String userAction) throws IOException;
 }

@@ -8,7 +8,7 @@ public class RandomPairs {
     private final Random random;
 
     public RandomPairs() {
-        this.random = new Random();
+        this.random = new Random(System.currentTimeMillis());
     }
 
     public List<int[]> generateDistinctPairs(int n) {

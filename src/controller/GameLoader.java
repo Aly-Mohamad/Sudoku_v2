@@ -92,4 +92,41 @@ public class GameLoader {
         
         return new Game(board, diff);
     }
+    
+    /**
+     * Loads a Sudoku game from an arbitrary file path (for user-provided solved games).
+     * @param filePath The absolute or relative path to the CSV file
+     * @return A Game object with the loaded board
+     * @throws IOException if file cannot be read or format is invalid
+     */
+    public Game loadGameFromPath(String filePath) throws IOException {
+        File file = new File(filePath);
+        if (!file.exists()) {
+            throw new FileNotFoundException("File not found: " + file.getAbsolutePath());
+        }
+        
+        int[][] board = new int[9][9];
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            for (int i = 0; i < 9; i++) {
+                String line = reader.readLine();
+                if (line == null) {
+                    throw new IOException("Invalid file format: File must have exactly 9 rows");
+                }
+                String[] parts = line.split(",");
+                if (parts.length != 9) {
+                    throw new IOException("Invalid row format: Row " + (i + 1) + " must have exactly 9 values");
+                }
+                for (int j = 0; j < 9; j++) {
+                    try {
+                        board[i][j] = Integer.parseInt(parts[j].trim());
+                    } catch (NumberFormatException e) {
+                        throw new IOException("Invalid number format at row " + (i + 1) + ", column " + (j + 1));
+                    }
+                }
+            }
+        }
+        
+        // Assume it's a solved game (no difficulty specified for external files)
+        return new Game(board, null);
+    }
 }

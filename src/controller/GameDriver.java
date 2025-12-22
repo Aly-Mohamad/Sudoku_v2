@@ -133,11 +133,64 @@ public class GameDriver implements Viewable {
     @Override
     public void driveGames(Game sourceGame) throws SolutionInvalidException {
         try {
+            // Verify the source solution first
+            verifyBoard(sourceGame.getBoard());
+            
             this.solvedGame = sourceGame;
             this.currentGame = generator.generate(sourceGame, sourceGame.getDifficulty());
             // Solution is kept in memory - will be saved when saving incomplete game
+        } catch (InvalidGameException e) {
+            throw new SolutionInvalidException("Source game is invalid: " + e.getMessage());
         } catch (Exception e) {
             throw new SolutionInvalidException(e.getMessage());
+        }
+    }
+    
+    /**
+     * Generates and saves games for empty difficulty folders from a source solved game.
+     * Only adds one valid complete sudoku solution to each empty folder.
+     * The loading process will handle creating puzzles with zeros based on difficulty.
+     * @param sourceGame The solved Sudoku game to use as source
+     * @throws SolutionInvalidException if the source game is invalid
+     * @throws IOException if saving fails
+     */
+    public void generateAllDifficultyLevels(Game sourceGame) throws SolutionInvalidException, IOException {
+        // Verify the source solution first - must be complete and valid
+        verifyBoard(sourceGame.getBoard());
+        
+        // Check that source game has no zeros (complete solution)
+        int[][] board = sourceGame.getBoard();
+        for (int i = 0; i < 9; i++) {
+            for (int j = 0; j < 9; j++) {
+                if (board[i][j] == 0) {
+                    throw new SolutionInvalidException("Source game must be a complete solution (no zeros)");
+                }
+            }
+        }
+        
+        // Check each difficulty folder and only add to empty ones
+        DifficultyEnum[] difficulties = {DifficultyEnum.EASY, DifficultyEnum.MEDIUM, DifficultyEnum.HARD};
+        
+        for (DifficultyEnum difficulty : difficulties) {
+            String difficultyFolder = difficulty.toString().toLowerCase();
+            
+            // Check if folder is empty
+            if (!storage.hasBoard(difficultyFolder)) {
+                // Folder is empty - save the complete valid solution
+                // Ensure directory exists
+                File dir = new File("storage/" + difficultyFolder);
+                if (!dir.exists()) {
+                    dir.mkdirs();
+                }
+                
+                // Create a copy of the source game with the correct difficulty set
+                Game gameToSave = new Game(sourceGame.getBoard(), difficulty);
+                
+                // Save the complete solution (no zeros) - loading will handle puzzle creation
+                String fileName = difficultyFolder + "_1";
+                storage.saveGame(gameToSave, difficultyFolder, fileName);
+            }
+            // If folder already has games, skip it
         }
     }
 
@@ -166,5 +219,10 @@ public class GameDriver implements Viewable {
         } catch (Exception e) {
             throw new InvalidGameException("Failed to solve: " + e.getMessage());
         }
+    }
+
+    @Override
+    public void logUserAction(String userAction) throws IOException {
+        storage.appendLog(userAction);
     }
 }
